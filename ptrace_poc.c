@@ -64,7 +64,7 @@ int main(int argc, char **argv) {
 	}
 	printf("[+] Got reg data\n[+] RIP is at %016llx\n[+] Injecting code...\n", reg_data.rip);
 	pad_shellcode(while_print, while_print_len, &padded);
-	for (i = 0, pokeaddr = reg_data.rip; i < padded.size; i++, pokeaddr += WORD_BYTES) {
+	for (i = 0, pokeaddr = reg_data.rip; i < padded.size / WORD_BYTES; i++, pokeaddr += WORD_BYTES) {
 		ptrace(PTRACE_POKETEXT, pid, pokeaddr, padded.shellcode[i]);
 	}
 	printf("[+] Code injected, detaching...\n");
