@@ -33,8 +33,8 @@ void pad_shellcode(unsigned char *shellcode, int len, struct padded_shellcode *d
 		dst->size = len;
 	} else {
 		padded_len = len + len % WORD_BYTES;
-		dst->shellcode = (WORD_CTYPE *) malloc(padded_len);
-		memcpy(dst->shellcode, shellcode, padded_len);
+		dst->shellcode = (WORD_CTYPE *) calloc(0, padded_len);
+		memcpy(dst->shellcode, shellcode, len);
 		dst->size = padded_len;
 	}
 }
@@ -59,6 +59,7 @@ int main(int argc, char **argv) {
 	ptrace(PTRACE_GETREGS, pid, NULL, &reg_data);
 	if (reg_data.rip & 0xffffffff == 0xffffffff) {
 		printf("[-] RIP looks broken\n");
+		ptrace(PTRACE_DETACH, pid, NULL, NULL);
 		exit(1);
 	}
 	printf("[+] Got reg data\n[+] RIP is at %016llx\n[+] Injecting code...\n", reg_data.rip);
