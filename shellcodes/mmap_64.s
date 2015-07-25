@@ -7,11 +7,7 @@ bits 64
 ; arg 5 r9
 ; arg 6 r8
 
-push 100
-call mmap_memory
-pop r12
-
-mmap_memory:
+mmap:
     push r12            ; we choose r12 for local storage, will be preserved by the syscall
     lea r12, [rsp+0x10] ; length, argument
     push rsi
