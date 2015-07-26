@@ -17,7 +17,7 @@ clone:
     push r10
     push r9
     mov rax, 56         ; __NR_clone
-    xor rdi, rdi        ; no flags
+    mov rdi, 0x00002000 ; CLONE_PTRACE
     xor rsi, rsi        ; copy on write stack
     xor rdx, rdx        ; no *ptid
     xor r10, r10        ; no *ctid
