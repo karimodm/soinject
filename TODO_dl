@@ -1,0 +1,23 @@
+Program Headers:
+  Type           Offset             VirtAddr           PhysAddr
+                 FileSiz            MemSiz              Flags  Align
+  PHDR           0x0000000000000040 0x0000003471a00040 0x0000003471a00040
+                 0x00000000000001f8 0x00000000000001f8  R E    8
+  INTERP         0x0000000000001a30 0x0000003471a01a30 0x0000003471a01a30
+                 0x000000000000001c 0x000000000000001c  R      10
+      [Requesting program interpreter: /lib64/ld-linux-x86-64.so.2]
+  LOAD           0x0000000000000000 0x0000003471a00000 0x0000003471a00000 <-- FIRST EXECUTABLE REGION
+                 0x0000000000002008 0x0000000000002008  R E    200000
+  LOAD           0x0000000000002d60 0x0000003471c02d60 0x0000003471c02d60
+                 0x0000000000000340 0x00000000000003b0  RW     200000
+
+
+Symbol table '.dynsym' contains 41 entries:
+   Num:    Value          Size Type    Bind   Vis      Ndx Name
+[...]
+    33: 0000003471a01090    79 FUNC    GLOBAL DEFAULT   13 dlopen@@GLIBC_2.2.5
+
+
+******************************
+Offset from base region to function is the same offset from base mem mapping of process to entry of function.
+******************************
