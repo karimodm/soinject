@@ -1,3 +1,5 @@
+#!/usr/bin/python
+
 import sys
 import os
 import re
@@ -40,13 +42,18 @@ def extract_libdl_mapping(maps):
     return None
 
 def get_func_offset(lib, sym, at_glibc = False):
+    import ipdb
+    ipdb.set_trace()
     try:
-        output = subprocess.check_output("readelf -s .dynsym %s" % lib)
+        output = subprocess.check_output(("readelf -s %s" % lib).split(' '))
     except OSError:
-        printerr("Failed to invoke readelf -s .dynsym over %s" % lib)
+        printerr("Failed to invoke readelf -s over %s" % lib)
         exit(-1)
-    extractor = re.compile("^\d+: ([a-z0-9]+) .+ %s%s$" % (lib, '@@GLIBC_.+' if at_glibc else ''))
-    m = extractor.match(output)
+    pattern = ("[0-9]+: ([a-z0-9]+) .+ %s%s$" % (sym, '@@GLIBC_.+' if at_glibc else ''))
+    extractor = re.compile("[0-9]+: ([a-z0-9]+) .+ %s%s$" % (sym, '@@GLIBC_.+' if at_glibc else ''))
+    for symbol in output.split("\n"):
+        m = extractor.match(symbol)
+        if m: break
     if not m:
         printerr("Failed to locate %s in %s, %s GLIBC" % (sym, lib, 'at' if at_glibc else 'not at'))
         return None
@@ -67,7 +74,7 @@ def inject(so, entry, pid = 1):
     if libdl is None:
         printerr('Selected process is not linked to libdl')
         exit(-1)
-    printok("Found %s at %s" % (libdl[0], libdl[1]))
+    printok("Process %d maps %s at 0x%s" % (pid, libdl[0], libdl[1]))
     dlopen_offset = get_func_offset(libdl[0], 'dlopen', at_glibc = True)
     if not dlopen_offset:
         printerr("Impossible to locate dlopen in %s" % libdl[0])
