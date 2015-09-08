@@ -42,22 +42,30 @@ def extract_libdl_mapping(maps):
     return None
 
 def get_func_offset(lib, sym, at_glibc = False):
-    import ipdb
-    ipdb.set_trace()
+    try:
+        output = subprocess.check_output(("readelf -l %s" % lib).split(' '))
+    except OSError:
+        printerr("Failed to invoke readelf -l over %s" % lib)
+        exit(-1)
+    extractor = re.compile("LOAD\s+[^\s]+\s+([^\s]+).+?R E", re.DOTALL) # first LOAD executable region
+    m = extractor.search(output)
+    if not m:
+        printerr("Failed to locate first LOAD executable region in %s" % lib)
+        return None
+    load_base = int(m.group(1), base = 16)
     try:
         output = subprocess.check_output(("readelf -s %s" % lib).split(' '))
     except OSError:
         printerr("Failed to invoke readelf -s over %s" % lib)
         exit(-1)
-    pattern = ("[0-9]+: ([a-z0-9]+) .+ %s%s$" % (sym, '@@GLIBC_.+' if at_glibc else ''))
     extractor = re.compile("[0-9]+: ([a-z0-9]+) .+ %s%s$" % (sym, '@@GLIBC_.+' if at_glibc else ''))
     for symbol in output.split("\n"):
-        m = extractor.match(symbol)
+        m = extractor.search(symbol)
         if m: break
     if not m:
         printerr("Failed to locate %s in %s, %s GLIBC" % (sym, lib, 'at' if at_glibc else 'not at'))
         return None
-    return m.group(1)
+    return int(m.group(1), base = 16) - load_base
 
 def inject(so, entry, pid = 1):
     if not is_alive(pid):
@@ -77,24 +85,21 @@ def inject(so, entry, pid = 1):
     printok("Process %d maps %s at 0x%s" % (pid, libdl[0], libdl[1]))
     dlopen_offset = get_func_offset(libdl[0], 'dlopen', at_glibc = True)
     if not dlopen_offset:
-        printerr("Impossible to locate dlopen in %s" % libdl[0])
         exit(-1)
-    printok("Found dlopen offset at %s" % dlopen_offset)
+    printok("Found dlopen offset at 0x%x" % dlopen_offset)
     dlsym_offset = get_func_offset(libdl[0], 'dlsym', at_glibc = True)
     if not dlsym_offset:
-        printerr("Impossible to locate dlsym in %s" % libdl[0])
         exit(-1)
-    printok("Found dlsym offset at %s" % dlopen_offset)
+    printok("Found dlsym offset at 0x%x" % dlsym_offset)
     if not get_func_offset(so, entry):
-        printerr('Your .so does not appear to be sane')
         exit(-1)
-    dlopen_address = hex(int(libdl) + int(dlopen_offset, base = 16))
-    dlsym_address = hex(int(libdl) + int(dlsym, base = 16))
+    dlopen_address = hex(int(libdl[1], base = 16) + dlopen_offset)
+    dlsym_address = hex(int(libdl[1], base = 16) + dlsym_offset)
     printok("Virtual Address of dlopen in %d is %s" % (pid, dlopen_address))
     printok("Virtual Address of dlsym in %d is %s" % (pid, dlsym_address))
     printok("Ready to inject, let's go. Invoking C injector...")
     printok("injector %d %s %s %s %s" % (pid, dlopen_address, dlsym_address, so, entry))
-    system("injector %d %s %s %s %s" % (pid, dlopen_address, dlsym_address, so, entry))
+    os.system("injector %d %s %s %s %s" % (pid, dlopen_address, dlsym_address, so, entry))
 
 if __name__ == '__main__':
     banner()
