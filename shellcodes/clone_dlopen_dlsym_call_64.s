@@ -45,24 +45,15 @@ quit:
     pop r12
     ret
 child:
-	lea r8, [dlopen_addr]
-	lea rdi, [so_file]
+	mov r8, 0xdeadbeefdeadbee1 ; stupid markers
+	mov rdi, 0xdeadbeefdeadbee2
 	xor rsi, rsi 		; no flags to dlopen
 	call r8				; dlopen
 	mov r9, rax			; mapped handle in r9
-	lea r8, [dlsym_addr]
+	lea r8, 0xdeadbeefdeadbee3
 	mov rdi, r9
-	lea rsi, [entry_name]
+	lea rsi, 0xdeadbeefdeadbee4
 	call r8				; dlsym
 	mov r10, rax
 	call r10			; call to the function, this should never return
 	jmp quit	
-
-dlopen_addr:
-	dq 0xdeadbeefdeadbeef
-dlsym_addr:
-	dq 0xdeadbeefdeadbeef
-so_file:
-	times 100 db 0
-entry_name:
-	times 100 db 0
