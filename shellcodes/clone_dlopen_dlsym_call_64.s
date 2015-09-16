@@ -7,53 +7,57 @@ bits 64
 ; arg 5 r9
 ; arg 6 r8
 
-clone:
-    push r12
-    mov r12, [rsp+0x10] ; target address for the new thread
+fork:
     push rax
-	push rbx
-	push rcx
-	push rdx
-    push rdi
     push rsi
-    push rdx
+    push rdi
     push r10
     push r9
-	push r8
-    mov rax, 56         ; __NR_clone
-    mov rdi, 0x00002000 ; CLONE_PTRACE
-    xor rsi, rsi        ; copy on write stack
-    xor rdx, rdx        ; no *ptid
-    xor r10, r10        ; no *ctid
-    xor r9, r9
+    push r8
+    mov rax, 57         ; __NR_fork
     syscall
     cmp rax, 0
     jne quit            ; we are in the parent
     jmp child
 quit:
-	pop r8
+    pop r8
     pop r9
     pop r10
-    pop rdx
-    pop rsi
     pop rdi
-	pop rdx
-	pop rcx
-	pop rbx
+    pop rsi
     pop rax
-	pop rcx
-    pop r12
     ret
 child:
-	mov r8, 0xdeadbeefdeadbee1 ; stupid markers
-	mov rdi, 0xdeadbeefdeadbee2
-	xor rsi, rsi 		; no flags to dlopen
-	call r8				; dlopen
-	mov r9, rax			; mapped handle in r9
-	lea r8, 0xdeadbeefdeadbee3
-	mov rdi, r9
-	lea rsi, 0xdeadbeefdeadbee4
-	call r8				; dlsym
-	mov r10, rax
-	call r10			; call to the function, this should never return
-	jmp quit	
+    jmp dlopen_addr_push
+dlopen_addr:
+    pop r8
+    jmp so_file_push
+so_file:
+    pop rdi
+    xor rsi, rsi        ; no flags to dlopen
+    call r8             ; dlopen
+    mov r9, rax         ; mapped handle in r9
+    jmp dlsym_addr_push
+dlsym_addr:
+    pop r8
+    mov rdi, r9
+    jmp entry_name_push
+entry_name:
+    pop rsi
+    call r8             ; dlsym
+    mov r10, rax
+    call r10            ; call to the function, this should never return
+    jmp quit    
+
+dlopen_addr_push:
+    call dlopen_addr
+    dq 0xdeadbeefdeadbeef
+dlsym_addr_push:
+    call dlsym_addr
+    dq 0xdeadbeefdeadbeef
+so_file_push:
+    call so_file
+    times 100 db 0
+entry_name_push:
+    call entry_name
+    times 100 db 0
