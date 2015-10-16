@@ -5,6 +5,8 @@
 #include <sys/ptrace.h>
 #include <sys/wait.h>
 #include <sys/user.h>
+#include <sys/types.h>
+#include <fcntl.h>
 
 #ifdef __x86_64__
 #	define WORD_BYTES 8
@@ -95,7 +97,7 @@ int main(int argc, char **argv) {
 	printf("[+] Got reg data\n[+] RIP is at %016llx\n", reg_data.rip);
 
 	/* Prepare shellcode */
-	patch_shellcode(loader_shellcode, loader_shellcode_length);
+	patch_shellcode(loader_shellcode, loader_shellcode_length, dlopen_addr, dlsym_addr, so, entrypoint);
 	pad_shellcode(loader_shellcode, loader_shellcode_length, &padded);
 
 	/* save clobbered .text section */
@@ -115,11 +117,11 @@ int main(int argc, char **argv) {
 	/* the shellcode will send to self a SIGUSR1 signal, upon receival we patch back the
 	 * original code in the parent to resume normal eecution */
 	printf("[+] Waiting for SIGUSR1...\n");
-	waitpid(pid);
+	waitpid(pid, NULL, 0);
 	ptrace(PTRACE_GETSIGINFO, pid, NULL, &siginfo);
 	if (siginfo.si_code != 10) { /* The signal received by the process is not SIGUSR1 */
 		printf("[-] Received signal not SIGUSR1, something went really bad, passing signal and detaching...");
-		kill(pid, sigindo.si_code); /* Pass back the signal to the process and detach */
+		kill(pid, siginfo.si_code); /* Pass back the signal to the process and detach */
 		ptrace(PTRACE_DETACH, pid, NULL, NULL);
 		exit(-1);
 	}

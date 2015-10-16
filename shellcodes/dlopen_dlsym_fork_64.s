@@ -27,8 +27,8 @@ leave:
 mov rax, 39		// getpid
 syscall 
 mov rsi, rax	// pid
+mov rax, 62		// kill
 mov rdi, 10		// SIGUSR1
-mov rax, 62
 syscall
 
 // throw signal for ptrace to collect us and repatch .text section
