@@ -4,7 +4,7 @@ jmp data_dlopen_addr
 dlopen:
 pop rax
 mov rax, [rax]
-call data_so
+jmp data_so
 so:
 pop rsi
 mov rsi, [rsi]
@@ -52,7 +52,7 @@ call dlsym_addr
 dq 0xdeadbeefdeadbeef
 data_so:
 call so
-dd 100 ; 100 times 0?
+times 100 db 0 ; 100 times 0?
 data_entrypoint:
 call entrypoint
-dd 100 
+times 100 db 0
