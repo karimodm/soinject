@@ -1,46 +1,58 @@
 bits 64
 
-lea rax, dlopen_addr
+jmp data_dlopen_addr
+dlopen:
+pop rax
 mov rax, [rax]
-lea rsi, so
+call data_so
+so:
+pop rsi
 mov rsi, [rsi]
-mov rdi, 1  	// RTLD_LAZY
-call *rax   	// dlopen
+mov rdi, 1  	; RTLD_LAZY
+call rax   	; dlopen
 
-mov rsi, rax 	// handle
-mov rax, dlsym_addr
+mov rsi, rax 	; handle
+jmp data_dlsym_addr
+dlsym_addr:
+pop rax
 mov rax, [rax]
-mov rdi, entrypoint
+jmp data_entrypoint
+entrypoint:
+pop rdi
 mov rdi, [rdi]
-call *rax
+call rax
 
-mov rbx, rax 	// function pointer
+mov rbx, rax 	; function pointer
 
-mov rax, 57 	// fork syscall
+mov rax, 57 	; fork syscall
 syscall
 test rax, rax
-jnz leave		// parent
+jnz leave		; parent
 
-jmp *rbx		// we are in the child, jump to entry point
+jmp rbx		; we are in the child, jump to entry point
 
 leave:
-mov rax, 39		// getpid
+mov rax, 39		; getpid
 syscall 
-mov rsi, rax	// pid
-mov rax, 62		// kill
-mov rdi, 10		// SIGUSR1
+mov rsi, rax	; pid
+mov rax, 62		; kill
+mov rdi, 10		; SIGUSR1
 syscall
 
-// throw signal for ptrace to collect us and repatch .text section
+; throw signal for ptrace to collect us and repatch .text section
 ret
 
-// Data section, these are placeholders that will need to be patched at runtime
+; Data section, these are placeholders that will need to be patched at runtime
 
-dlopen_addr:
+data_dlopen_addr:
+call dlopen
 dq 0xdeadbeefdeadbeef
-dlsym_addr:
+data_dlsym_addr:
+call dlsym_addr
 dq 0xdeadbeefdeadbeef
-so:
-dd 100 // 100 times 0?
-entrypoint:
+data_so:
+call so
+dd 100 ; 100 times 0?
+data_entrypoint:
+call entrypoint
 dd 100 
