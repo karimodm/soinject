@@ -56,18 +56,18 @@ unsigned int loader_shellcode_length = 315;
  * buffer. */
 void patch_shellcode(unsigned char *shellcode, int len, WORD_CTYPE dlopen_addr, WORD_CTYPE dlsym_addr, char *so, char *entrypoint) {
 	unsigned char *ptr;	
-	ptr = &shellcode[len - 1 - 100 * 2 - sizeof(WORD_CTYPE) * 2 - 3 * 4]; /* 3 * 4 are the call instructions */
-	ptr += 3; /* skip call instruction */
+	ptr = &shellcode[len - 100 * 2 - sizeof(WORD_CTYPE) * 2 - 5 * 4]; /* 5 * 4 are the call instructions */
+	ptr += 5; /* skip call instruction */
 	*((WORD_CTYPE *)ptr) = dlopen_addr;
 	ptr += sizeof(WORD_CTYPE);
-	ptr += 3;
+	ptr += 5;
 	*((WORD_CTYPE *)ptr) = dlsym_addr;
 	ptr += sizeof(WORD_CTYPE);
-	ptr += 3;
+	ptr += 5;
 	strncpy(ptr, so, 100);
 	ptr += 100;
-	ptr += 3;
-	strncpy(ptr, so, 100);
+	ptr += 5;
+	strncpy(ptr, entrypoint, 100);
 }
 
 void pad_shellcode(unsigned char *shellcode, int len, struct padded_shellcode *dst) {
@@ -95,27 +95,33 @@ int main(int argc, char **argv) {
 	siginfo_t siginfo;
 
 	if (argc != 6) {
-		printf("Usage: injector PID dlopen_address dlsym_address so entrypoint\n");
-		exit(1);
+		printf("Usage: injector PID 0xdlopen_address 0xdlsym_address so entrypoint\n");
+		exit(-1);
 	}
 
 	pid = atoi(argv[1]);
-	dlopen_addr = atol(argv[2]);
-	dlsym_addr = atol(argv[3]);
+	sscanf(argv[2], "0x%x", &dlopen_addr);
+	sscanf(argv[3], "0x%x", &dlsym_addr);
 	so = argv[4];
 	entrypoint = argv[5];
 
-	fd = (so, O_RDONLY);
+	if (!pid || !dlopen_addr || !dlsym_addr || !so[0] || !entrypoint[0]) {
+		printf("Could not parse arguments!\n");
+		printf("Usage: injector PID 0xdlopen_address 0xdlsym_address so entrypoint\n");
+		exit(-1);
+	}
+
+	fd = open(so, O_RDONLY);
 	if (!fd) {
 		printf("[-] Unable to find .so file %s\n", so);
-		exit(1);
+		exit(-1);
 	}
 	close(fd);
 
 
 	if (ptrace(PTRACE_ATTACH, pid, NULL, NULL) == -1) {
 		printf("[-] Unable to attach to %d\n", pid);
-		exit(1);
+		exit(-1);
 	}
 	printf("[+] Successfully attached to %d\n", pid);
 	waitpid(pid, NULL, 0);
@@ -124,16 +130,16 @@ int main(int argc, char **argv) {
 	if (reg_data.rip & 0xffffffff == 0xffffffff) {
 		printf("[-] RIP looks broken\n");
 		ptrace(PTRACE_DETACH, pid, NULL, NULL);
-		exit(1);
+		exit(-1);
 	}
-	printf("[+] Got reg data\n[+] RIP is at %016llx\n", reg_data.rip);
+	printf("[+] Got reg data\n[+] RIP is at 0x%016llx\n", reg_data.rip);
 
 	/* Prepare shellcode */
 	patch_shellcode(loader_shellcode, loader_shellcode_length, dlopen_addr, dlsym_addr, so, entrypoint);
 	pad_shellcode(loader_shellcode, loader_shellcode_length, &padded);
 
 	/* save clobbered .text section */
-	printf("[+] Dumping clobbered code segment...");
+	printf("[+] Dumping clobbered code segment...\n");
 	clobbered_text = (WORD_CTYPE *)malloc(padded.size);
 	for (i = 0, pokeaddr = reg_data.rip; i < padded.size / WORD_BYTES; i++, pokeaddr += WORD_BYTES)
 		clobbered_text[i] = ptrace(PTRACE_PEEKTEXT, pid, pokeaddr, NULL);
@@ -143,16 +149,16 @@ int main(int argc, char **argv) {
 	printf("[+] Injecting loader shellcode...\n");
 	for (i = 0, pokeaddr = reg_data.rip; i < padded.size / WORD_BYTES; i++, pokeaddr += WORD_BYTES) 
 		ptrace(PTRACE_POKETEXT, pid, pokeaddr, padded.shellcode[i]);
-	printf("[+] Loader shellcode injected.");
+	printf("[+] Loader shellcode injected.\n");
 	ptrace(PTRACE_CONT, pid, NULL, NULL);
 
 	/* the shellcode will send to self a SIGUSR1 signal, upon receival we patch back the
-	 * original code in the parent to resume normal eecution */
+	 * original code in the parent to resume normal execution */
 	printf("[+] Waiting for SIGUSR1...\n");
 	waitpid(pid, NULL, 0);
 	ptrace(PTRACE_GETSIGINFO, pid, NULL, &siginfo);
 	if (siginfo.si_code != 10) { /* The signal received by the process is not SIGUSR1 */
-		printf("[-] Received signal not SIGUSR1, something went really bad, passing signal and detaching...");
+		printf("[-] Received signal is not SIGUSR1, received %d instead, something went really bad, passing signal and detaching...", siginfo.si_code);
 		kill(pid, siginfo.si_code); /* Pass back the signal to the process and detach */
 		ptrace(PTRACE_DETACH, pid, NULL, NULL);
 		exit(-1);
