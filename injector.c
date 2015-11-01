@@ -51,8 +51,8 @@ unsigned char loader_shellcode[] = {
 };
 unsigned int loader_shellcode_length = 315;
 
-/* We expect the shellcode to end with a 3-byes call instruction, 1 processor-sized WORD, a 3-bytes call instructrion,
- * 1 processor-sized WORD, a 3-bytes call instruction, 100 bytes buffer, 3-bytes call instruction and finally a 100 byes
+/* We expect the shellcode to end with a 5-byes call instruction, 1 processor-sized WORD, a 5-bytes call instructrion,
+ * 1 processor-sized WORD, a 5-bytes call instruction, 100 bytes buffer, 5-bytes call instruction and finally a 100 byes
  * buffer. */
 void patch_shellcode(unsigned char *shellcode, int len, WORD_CTYPE dlopen_addr, WORD_CTYPE dlsym_addr, char *so, char *entrypoint) {
 	unsigned char *ptr;	
@@ -83,6 +83,27 @@ void pad_shellcode(unsigned char *shellcode, int len, struct padded_shellcode *d
 	}
 }
 
+int parse_arguments(int argc, char **argv, pid_t *pid, WORD_CTYPE *dlopen_addr, WORD_CTYPE *dlsym_addr, char **so, char **entrypoint) {
+	if (argc != 6) {
+		printf("Usage: injector PID 0xdlopen_address 0xdlsym_address so entrypoint\n");
+		return 0;
+	}
+
+	*pid = atoi(argv[1]);
+	sscanf(argv[2], "0x%llx", dlopen_addr);
+	sscanf(argv[3], "0x%llx", dlsym_addr);
+	*so = argv[4];
+	*entrypoint = argv[5];
+
+	if (!*pid || !*dlopen_addr || !*dlsym_addr || !*so[0] || !*entrypoint[0]) {
+		printf("Could not parse arguments!\n");
+		printf("Usage: injector PID 0xdlopen_address 0xdlsym_address so entrypoint\n");
+		return 0;
+	}
+	
+	return 1;
+}
+
 int main(int argc, char **argv) {
 	int i, fd;
 	pid_t pid;
@@ -94,22 +115,8 @@ int main(int argc, char **argv) {
 	struct padded_shellcode padded;
 	siginfo_t siginfo;
 
-	if (argc != 6) {
-		printf("Usage: injector PID 0xdlopen_address 0xdlsym_address so entrypoint\n");
+	if (!parse_arguments(argc, argv, &pid, &dlopen_addr, &dlsym_addr, &so, &entrypoint))
 		exit(-1);
-	}
-
-	pid = atoi(argv[1]);
-	sscanf(argv[2], "0x%x", &dlopen_addr);
-	sscanf(argv[3], "0x%x", &dlsym_addr);
-	so = argv[4];
-	entrypoint = argv[5];
-
-	if (!pid || !dlopen_addr || !dlsym_addr || !so[0] || !entrypoint[0]) {
-		printf("Could not parse arguments!\n");
-		printf("Usage: injector PID 0xdlopen_address 0xdlsym_address so entrypoint\n");
-		exit(-1);
-	}
 
 	fd = open(so, O_RDONLY);
 	if (!fd) {
